@@ -1,0 +1,53 @@
+{
+  "name": "Report",
+  "type": "object",
+  "properties": {
+    "reporter_user_id": {
+      "type": "string",
+      "description": "ID of the user making the report"
+    },
+    "reported_artist_id": {
+      "type": "string",
+      "description": "ID of the artist profile being reported"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "inappropriate_content",
+        "fake_profile",
+        "stolen_identity",
+        "impersonation",
+        "spam",
+        "harassment",
+        "other"
+      ],
+      "description": "Reason for the report"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Detailed description of the issue"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "reviewed",
+        "resolved",
+        "dismissed"
+      ],
+      "default": "pending",
+      "description": "Status of the report"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Internal notes from admin review"
+    }
+  },
+  "required": [
+    "reporter_user_id",
+    "reported_artist_id",
+    "reason",
+    "description"
+  ]
+}

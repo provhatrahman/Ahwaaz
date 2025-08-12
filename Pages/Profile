@@ -1,0 +1,701 @@
+
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { User } from "@/entities/User";
+import { Artist } from "@/entities/Artist";
+import { UploadFile } from "@/integrations/Core";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, Plus, Trash2, ChevronsUpDown, Check, X, UploadCloud, Loader2, User as UserIcon, AlertCircle, Save } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { createPageUrl } from "@/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { countries } from "@/components/data/countries";
+import { InvokeLLM } from "@/integrations/Core";
+import ImageUploadPreview from "../components/profile/ImageUploadPreview";
+import { useTheme } from "../components/theme/ThemeProvider";
+
+const creativePractices = [
+  "A&R", "Actor", "Agency", "Agent", "Animator", "Architect", "Art Director", "Audio Engineer", "Author",
+  "Band", "Choreographer", "Cinematographer", "Collective", "Colourist", "Composer", "Content Creator",
+  "Copywriter", "Creative Director", "Creative Strategist", "Curator", "DJ", "Dancer", "Drag Artist",
+  "Event Producer", "Event Promoter", "Fashion Designer", "Film Director", "Graphic Designer",
+  "Illustrator", "Journalist", "Label Manager", "Lighting Designer", "Manager", "Marketing Manager",
+  "Mastering Engineer", "Mixing Engineer", "Motion Graphics Artist", "Music Producer", "Music Supervisor",
+  "Musician", "PR", "Painter", "Photographer", "Playwright", "Poet", "Radio Host", "Rapper", "Record Label", "Screenwriter",
+  "Set Designer", "Social Media Manager", "Songwriter", "Sound Designer", "Tailor", "Tour Manager",
+  "Venue Owner", "Video Editor", "Videographer", "Visual Artist", "Vocalist", "Voice Actor"
+].sort();
+
+const contactMethods = ["Email", "Instagram", "Website", "Phone", "None"];
+
+function PracticeCombobox({ value, onValueChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const { isDarkMode } = useTheme();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={`w-full justify-between shadow-md focus:ring-emerald-400 focus:border-emerald-300 backdrop-blur-xl ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 hover:bg-gray-900/70 text-gray-200' : 'bg-white/30 border-white/60 hover:bg-white/40 focus:bg-white/40'}`}
+        >
+          {value || placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className={`w-full p-0 backdrop-blur-2xl border shadow-lg ${isDarkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/90 border-white/50'}`}>
+        <Command>
+          <CommandInput
+            placeholder="Search practices..."
+            className={`shadow-sm focus:ring-emerald-400 focus:border-emerald-300 backdrop-blur-xl ${isDarkMode ? 'bg-black/70 border-gray-800 text-gray-200' : 'bg-white/30 border-white/60 focus:bg-white/40'}`}
+            onValueChange={setSearchValue}
+          />
+          <CommandList>
+            <CommandEmpty>
+              {searchValue && (
+                <div className="p-2">
+                  <Button
+                    variant="ghost"
+                    className={`w-full justify-start ${isDarkMode ? 'hover:bg-gray-800/50 text-gray-200' : 'hover:bg-white/30'}`}
+                    onClick={() => {
+                      onValueChange(searchValue);
+                      setOpen(false);
+                      setSearchValue("");
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add "{searchValue}"
+                  </Button>
+                </div>
+              )}
+            </CommandEmpty>
+            <CommandGroup>
+              {creativePractices.map((practice) => (
+                <CommandItem
+                  key={practice}
+                  value={practice}
+                  onSelect={(currentValue) => {
+                    const matchingPractice = creativePractices.find(p => p.toLowerCase() === currentValue.toLowerCase());
+                    onValueChange(matchingPractice || currentValue);
+                    setOpen(false);
+                  }}
+                  className={`${isDarkMode ? 'hover:bg-gray-800/50 text-gray-200' : 'hover:bg-white/30'}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === practice ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {practice}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function CountryCombobox({ value, onValueChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const { isDarkMode } = useTheme();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={`w-full justify-between shadow-md focus:ring-emerald-400 focus:border-emerald-300 backdrop-blur-xl ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 hover:bg-gray-900/70 text-gray-200' : 'bg-white/30 border-white/60 hover:bg-white/40 focus:bg-white/40'}`}
+        >
+          {value
+            ? countries.find((country) => country.name.toLowerCase() === value.toLowerCase())?.name
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className={`w-[--radix-popover-trigger-width] p-0 backdrop-blur-2xl border shadow-lg ${isDarkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/90 border-white/50'}`}>
+        <Command>
+          <CommandInput
+            placeholder="Search country..."
+            className={`shadow-sm focus:ring-emerald-400 focus:border-emerald-300 backdrop-blur-xl ${isDarkMode ? 'bg-black/70 border-gray-800 text-gray-200' : 'bg-white/30 border-white/60 focus:bg-white/40'}`}
+          />
+          <CommandList>
+            <CommandEmpty>No country found.</CommandEmpty>
+            <CommandGroup>
+              {countries.map((country) => (
+                <CommandItem
+                  key={country.code}
+                  value={country.name}
+                  onSelect={(currentValue) => {
+                    const matchingCountry = countries.find(c => c.name.toLowerCase() === currentValue.toLowerCase());
+                    onValueChange(matchingCountry?.name || currentValue);
+                    setOpen(false);
+                  }}
+                  className={`${isDarkMode ? 'hover:bg-gray-800/50 text-gray-200' : 'hover:bg-white/30'}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === country.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {country.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export default function ProfilePage() {
+  const { isDarkMode } = useTheme();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [profileId, setProfileId] = useState(null);
+  const [isPublished, setIsPublished] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    location_city: "",
+    location_country: "",
+    latitude: null,
+    longitude: null,
+    primary_practice: "",
+    secondary_practices: [],
+    style_genre: "",
+    ethnic_background: "",
+    bio: "",
+    portfolio_links: {
+      website: "",
+      instagram: ""
+    },
+    custom_links: [],
+    contact_method: "",
+    profile_image_url: "",
+    profile_image_object_position: "50% 50%",
+    profile_image_scale: 100
+  });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isNormalizingLocation, setIsNormalizingLocation] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    setProfileId(id);
+    loadUserAndProfile(id);
+    // Scroll to top when component mounts (especially when editing)
+    window.scrollTo(0, 0);
+  }, [location.search]);
+
+  const loadUserAndProfile = async (id) => {
+    try {
+      const user = await User.me();
+      setCurrentUser(user);
+
+      if (id) {
+        const profile = await Artist.get(id);
+        if (profile.user_id !== user.id) {
+            console.error("User does not have permission to edit this profile.");
+            window.location.href = createPageUrl("Dashboard");
+            return;
+        }
+
+        setFormData({
+          name: profile.name || "",
+          email: profile.email || user.email || "",
+          phone: profile.phone || "",
+          location_city: profile.location_city || "",
+          location_country: profile.location_country || "",
+          latitude: profile.latitude || null,
+          longitude: profile.longitude || null,
+          primary_practice: profile.primary_practice || "",
+          secondary_practices: profile.secondary_practices || [],
+          style_genre: profile.style_genre || "",
+          ethnic_background: profile.ethnic_background || "",
+          bio: profile.bio || "",
+          portfolio_links: profile.portfolio_links || { website: "", instagram: "" },
+          custom_links: profile.custom_links || [],
+          contact_method: profile.contact_method || "",
+          profile_image_url: profile.profile_image_url || "",
+          profile_image_object_position: profile.profile_image_object_position || "50% 50%",
+          profile_image_scale: profile.profile_image_scale || 100
+        });
+        setIsPublished(profile.is_published);
+      } else {
+        setFormData(prev => ({ ...prev, email: user.email || "", name: user.full_name || "" }));
+      }
+      setIsDirty(false); // Form is clean after initial load
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      window.location.href = createPageUrl("Map");
+    }
+  };
+
+  const handleFormChange = (newFormData) => {
+    setIsDirty(true);
+    setFormData(newFormData);
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const { file_url } = await UploadFile({ file });
+      setFormData({ ...formData, profile_image_url: file_url });
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.profile_image_url;
+        return newErrors;
+      });
+      setIsDirty(true); // Image upload makes form dirty
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setErrors(prev => ({...prev, profile_image_url: "Upload failed. Please try again."}));
+    }
+    setIsUploading(false);
+  };
+
+  const handleObjectPositionChange = (position) => {
+    setFormData(prev => ({ ...prev, profile_image_object_position: position }));
+    setIsDirty(true); // Object position change makes form dirty
+  };
+
+  const handleImageScaleChange = (scale) => {
+    setFormData(prev => ({ ...prev, profile_image_scale: scale }));
+    setIsDirty(true); // Image scale change makes form dirty
+  };
+
+  const normalizeLocation = async (city, country) => {
+    if (!city || !country) return null;
+
+    try {
+      const response = await InvokeLLM({
+        prompt: `Validate the location: City='${city}', Country='${country}'. Is this a real, recognized city within that country? If yes, provide the standardized city name, standardized country name, and precise latitude/longitude coordinates. If no, just respond with 'isValid' as false.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            isValid: { type: "boolean", description: "True if the city is valid within the country, otherwise false." },
+            city: { type: "string", description: "The standardized name of the city" },
+            country: { type: "string", description: "The standardized name of the country" },
+            latitude: { type: "number", description: "The latitude of the location." },
+            longitude: { type: "number", description: "The longitude of the location." }
+          },
+          required: ["isValid"]
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error("Failed to normalize location:", error);
+      return { isValid: false, error: "Validation service failed." };
+    }
+  };
+
+  const handleLocationBlur = async () => {
+    if (errors.location_city) {
+        setErrors(prev => ({...prev, location_city: undefined}));
+    }
+    
+    if (!formData.location_city.trim() || !formData.location_country.trim()) return;
+    setIsNormalizingLocation(true);
+
+    const normalized = await normalizeLocation(formData.location_city, formData.location_country);
+    
+    if (normalized && normalized.isValid) {
+      setFormData(prev => ({
+        ...prev,
+        location_city: normalized.city,
+        location_country: normalized.country,
+        latitude: normalized.latitude,
+        longitude: normalized.longitude
+      }));
+      setIsDirty(true); // Location normalization makes form dirty
+    } else {
+      setErrors(prev => ({...prev, location_city: "City not found in the selected country. Please check."}));
+      setFormData(prev => ({ ...prev, latitude: null, longitude: null }));
+    }
+
+    setIsNormalizingLocation(false);
+  };
+  
+  const handleCountryChange = (value) => {
+    handleFormChange({ // Use handleFormChange
+        ...formData,
+        location_country: value,
+        location_city: "",
+        latitude: null,
+        longitude: null
+    });
+    if (errors.location_city) {
+        setErrors(prev => ({...prev, location_city: undefined}));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.name.trim()) newErrors.name = "Name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    if (!formData.location_city.trim()) newErrors.location_city = "City is required";
+    if (!formData.location_country.trim()) newErrors.location_country = "Country is required";
+    if (!formData.primary_practice.trim()) newErrors.primary_practice = "Primary practice is required";
+    if (!formData.bio.trim()) newErrors.bio = "Bio is required";
+    if (formData.bio.length > 500) newErrors.bio = "Bio must be 500 characters or less";
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const addCustomLink = () => {
+    handleFormChange({ // Use handleFormChange
+      ...formData,
+      custom_links: [...(formData.custom_links || []), { label: "", url: "" }]
+    });
+  };
+
+  const removeCustomLink = (index) => {
+    const newLinks = formData.custom_links.filter((_, i) => i !== index);
+    handleFormChange({ ...formData, custom_links: newLinks }); // Use handleFormChange
+  };
+
+  const updateCustomLink = (index, field, value) => {
+    const newLinks = [...formData.custom_links];
+    newLinks[index][field] = value;
+    handleFormChange({ ...formData, custom_links: newLinks }); // Use handleFormChange
+  };
+
+  const addSecondaryPractice = (practice) => {
+    if (!formData.secondary_practices.includes(practice)) {
+      handleFormChange({ // Use handleFormChange
+        ...formData,
+        secondary_practices: [...formData.secondary_practices, practice]
+      });
+    }
+  };
+
+  const removeSecondaryPractice = (practice) => {
+    handleFormChange({ // Use handleFormChange
+      ...formData,
+      secondary_practices: formData.secondary_practices.filter(p => p !== practice)
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    setIsSubmitting(true);
+
+    try {
+      let finalFormData = { ...formData };
+      if (finalFormData.latitude === null || finalFormData.longitude === null) {
+        const normalized = await normalizeLocation(formData.location_city, formData.location_country);
+        if (normalized && normalized.isValid) {
+          finalFormData = { ...finalFormData, ...normalized };
+        } else {
+          finalFormData.latitude = 0;
+          finalFormData.longitude = 0;
+        }
+      }
+
+      const artistData = {
+        ...finalFormData,
+        user_id: currentUser.id,
+        custom_links: (finalFormData.custom_links || []).filter(link => link.label && link.url),
+        is_published: profileId ? isPublished : false,
+      };
+
+      if (profileId) {
+        await Artist.update(profileId, artistData);
+      } else {
+        await Artist.create(artistData);
+      }
+
+      setIsSuccess(true);
+      setIsDirty(false); // Form is clean after successful save
+    } catch (error) {
+      console.error("Error saving artist profile:", error);
+      setErrors({ submit: "Failed to save profile. Please try again." });
+    }
+    setIsSubmitting(false);
+  };
+
+  if (isSuccess) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${isDarkMode ? 'bg-black' : 'bg-gradient-to-br from-emerald-50 via-white to-yellow-50'}`}>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className={`text-center backdrop-blur-3xl border p-8 rounded-2xl shadow-2xl max-w-lg ${isDarkMode ? 'bg-gray-900/60 border-gray-800/50' : 'bg-white/20 border-white/30'}`}
+        >
+          <div className={`w-20 h-20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6 border shadow-lg ${isDarkMode ? 'bg-emerald-900/50 border-emerald-700/50' : 'bg-emerald-100/60 border-white/30'}`}>
+            <CheckCircle className={`w-10 h-10 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
+          </div>
+          <h2 className={`text-3xl font-bold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Profile Saved!</h2>
+          <p className={`mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Your artist profile has been {profileId ? 'updated' : 'created'} successfully.
+          </p>
+          {!isPublished && (
+            <Alert className={`mb-6 text-left backdrop-blur-2xl border shadow-md ${isDarkMode ? 'bg-yellow-900/40 border-yellow-700/40' : 'bg-yellow-50/60 border-yellow-200/50'}`}>
+              <AlertCircle className={`h-4 w-4 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}/>
+              <AlertTitle className={isDarkMode ? 'text-yellow-200' : 'text-yellow-800'}>Your Profile is a Draft</AlertTitle>
+              <AlertDescription className={isDarkMode ? 'text-yellow-300' : 'text-yellow-700'}>
+                Your profile is not yet visible to the community. Go to your dashboard to publish it.
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="flex gap-4 justify-center">
+            <Link to={createPageUrl("Dashboard")}>
+              <Button className={`backdrop-blur-2xl shadow-lg ${isDarkMode ? 'bg-emerald-600/70 hover:bg-emerald-600/90 border-emerald-500/70' : 'bg-emerald-600/60 hover:bg-emerald-600/80 border-emerald-500/60'}`}>
+                Go to Dashboard
+              </Button>
+            </Link>
+            <Link to={createPageUrl("Map")}>
+              <Button variant="outline" className={`backdrop-blur-2xl shadow-lg ${isDarkMode ? 'bg-gray-900/40 border-gray-800/60 hover:bg-gray-800/50 text-gray-300' : 'border-white/50 bg-white/10 hover:bg-white/20'}`}>
+                Explore Community
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`min-h-screen p-4 overflow-x-hidden ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-emerald-50 via-white to-yellow-50'}`}>
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Link to={createPageUrl("Dashboard")}>
+            <Button variant="outline" className={`backdrop-blur-2xl shadow-lg ${isDarkMode ? 'bg-gray-800/60 border-gray-700/60 hover:bg-gray-700/60 text-gray-300' : 'border-white/50 bg-white/10 hover:bg-white/20'}`}>
+              ← Back to Dashboard
+            </Button>
+          </Link>
+          <div>
+            <h1 className={`text-xl md:text-2xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              {profileId ? 'Edit Your Profile' : 'Create Your Profile'}
+            </h1>
+          </div>
+        </div>
+
+        {/* SAVE REMINDER ALERT - ADDED */}
+        <Alert className={`mb-6 text-left backdrop-blur-2xl border shadow-md ${isDarkMode ? 'bg-blue-900/40 border-blue-700/40' : 'bg-blue-50/60 border-blue-200/50'}`}>
+          <Save className={`h-4 w-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}/>
+          <AlertTitle className={isDarkMode ? 'text-blue-200' : 'text-blue-800'}>Remember to Save</AlertTitle>
+          <AlertDescription className={isDarkMode ? 'text-blue-300' : 'text-blue-700'}>
+            Don't forget to scroll down and click "Create/Update Profile" to save all your changes after filling out the form.
+          </AlertDescription>
+        </Alert>
+
+        <Card className={`shadow-2xl border-0 backdrop-blur-2xl ${isDarkMode ? 'bg-gray-800/40' : 'bg-white/15'}`}>
+          <CardHeader>
+            <CardTitle className={`text-xl ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Artist Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {errors.submit && (
+                <div className={`border rounded-lg p-4 backdrop-blur-2xl shadow-md ${isDarkMode ? 'bg-red-900/40 border-red-700/40' : 'bg-red-50/80 border-red-200/50'}`}>
+                  <p className={`text-sm ${isDarkMode ? 'text-red-300' : 'text-red-700'}`}>{errors.submit}</p>
+                </div>
+              )}
+
+              <ImageUploadPreview
+                formData={formData}
+                onImageUpload={handleFileUpload}
+                isUploading={isUploading}
+                uploadError={errors.profile_image_url}
+                onObjectPositionChange={handleObjectPositionChange}
+                onImageScaleChange={handleImageScaleChange}
+              />
+
+              <div className="space-y-4">
+                <h3 className={`text-lg font-semibold border-b pb-2 ${isDarkMode ? 'text-gray-100 border-gray-700/50' : 'text-gray-900 border-white/40'}`}>
+                  Basic Information
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="name" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Full Name *</Label>
+                    <Input id="name" value={formData.name} onChange={(e) => handleFormChange({...formData, name: e.target.value})} placeholder="Your full name" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'} ${errors.name ? "border-red-300" : ""}`} />
+                    {errors.name && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.name}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="email" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Email *</Label>
+                    <Input id="email" type="email" value={formData.email} onChange={(e) => handleFormChange({...formData, email: e.target.value})} placeholder="your@email.com" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'} ${errors.email ? "border-red-300" : ""}`} />
+                    {errors.email && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.email}</p>}
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="country" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Country *</Label>
+                    <CountryCombobox value={formData.location_country} onValueChange={handleCountryChange} placeholder="Select your country" />
+                    {errors.location_country && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.location_country}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="city" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>City *</Label>
+                    <div className="relative">
+                      <Input id="city" value={formData.location_city} onChange={(e) => handleFormChange({...formData, location_city: e.target.value})} onBlur={handleLocationBlur} placeholder="Your city" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'} ${errors.location_city ? "border-red-300" : ""}`} />
+                      {isNormalizingLocation && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />}
+                    </div>
+                    {errors.location_city && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.location_city}</p>}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="ethnic_background" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Ethnic/Cultural Background</Label>
+                  <Input id="ethnic_background" value={formData.ethnic_background} onChange={(e) => handleFormChange({...formData, ethnic_background: e.target.value})} placeholder="e.g., Punjabi, Bengali, Tamil, Pakistani, etc." className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`} />
+                  <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Help others discover artists from their community</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Primary Creative Practice *</Label>
+                <PracticeCombobox value={formData.primary_practice} onValueChange={(value) => handleFormChange({...formData, primary_practice: value})} placeholder="Select your main creative practice" />
+                {errors.primary_practice && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.primary_practice}</p>}
+              </div>
+              <div>
+                <Label className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Secondary Creative Practices</Label>
+                <PracticeCombobox value="" onValueChange={addSecondaryPractice} placeholder="Add additional practices" />
+                {(formData.secondary_practices || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <p className="sr-only">Secondary Practices:</p>
+                    {formData.secondary_practices.map((practice, index) => (
+                      <Badge key={index} variant="secondary" className={`flex items-center gap-2 backdrop-blur-sm ${isDarkMode ? 'bg-gray-800/50 border-gray-700/50 text-gray-300' : 'bg-white/15 border-white/20 text-gray-700'}`}>
+                        {practice}
+                        <X className={`w-3 h-3 cursor-pointer ${isDarkMode ? 'hover:text-red-400' : 'hover:text-red-600'}`} onClick={() => removeSecondaryPractice(practice)} />
+                        <span className="sr-only">Remove {practice}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="style" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Style/Genre</Label>
+                  <Input id="style" value={formData.style_genre} onChange={(e) => handleFormChange({...formData, style_genre: e.target.value})} placeholder="e.g., Lo-fi Hip Hop, Portrait Photography" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`} />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="bio" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Bio/Artist Statement * ({formData.bio.length}/500)</Label>
+                <Textarea id="bio" value={formData.bio} onChange={(e) => handleFormChange({...formData, bio: e.target.value})} placeholder="Tell us about your creative journey..." className={`h-32 backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'} ${errors.bio ? "border-red-300" : ""}`} maxLength={500} />
+                {errors.bio && <p className={`text-sm mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{errors.bio}</p>}
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="website" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Website</Label>
+                  <Input id="website" value={formData.portfolio_links.website} onChange={(e) => handleFormChange({...formData, portfolio_links: { ...formData.portfolio_links, website: e.target.value }})} placeholder="https://yourwebsite.com" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`} />
+                </div>
+                <div>
+                  <Label htmlFor="instagram" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Instagram</Label>
+                  <Input id="instagram" value={formData.portfolio_links.instagram} onChange={(e) => handleFormChange({...formData, portfolio_links: { ...formData.portfolio_links, instagram: e.target.value }})} placeholder="@yourusername" className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-700/50 border-gray-600/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                 <div>
+                    <Label className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Preferred Contact Method</Label>
+                    <Select value={formData.contact_method} onValueChange={(value) => handleFormChange({...formData, contact_method: value})}>
+                      <SelectTrigger className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 text-gray-200' : 'bg-white/30 border-white/60'}`}><SelectValue placeholder="How should people contact you?" /></SelectTrigger>
+                      <SelectContent className={`backdrop-blur-2xl border shadow-lg ${isDarkMode ? 'bg-gray-950/95 border-gray-800 text-gray-200' : 'bg-white/90 border-white/50'}`}>
+                        {contactMethods.map((method) => <SelectItem key={method} value={method} className={isDarkMode ? 'hover:bg-gray-800/60' : 'hover:bg-white/20'}>{method === "None" ? "No preferred contact" : method}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                  <Label htmlFor="phone" className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Phone Number</Label>
+                  <Input id="phone" value={formData.phone} onChange={(e) => handleFormChange({...formData, phone: e.target.value})} placeholder="Your contact number" disabled={formData.contact_method !== 'Phone'} className={`backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 text-gray-200 placeholder:text-gray-500 disabled:bg-gray-950/20 disabled:border-gray-800/40' : 'bg-white/30 border-white/60 disabled:bg-gray-500/20 disabled:border-gray-400/40'}`} />
+                   {formData.contact_method !== 'Phone' && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Select 'Phone' as contact method to enable.</p>}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>Additional Links</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addCustomLink} className={`backdrop-blur-2xl shadow-md ${isDarkMode ? 'border-gray-800/60 bg-gray-900/40 hover:bg-gray-800/50 text-gray-300' : 'border-white/50 bg-white/10 hover:bg-white/20'}`}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Link
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {(formData.custom_links || []).map((link, index) => (
+                    <div key={index} className={`p-4 rounded-lg border backdrop-blur-md shadow-inner space-y-3 ${isDarkMode ? 'bg-black/30 border-gray-800/50' : 'bg-white/10 border-white/30'}`}>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor={`link-label-${index}`} className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Link {index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeCustomLink(index)}
+                          className={`h-8 w-8 p-0 ${isDarkMode ? 'text-red-400 hover:text-red-500 hover:bg-red-900/20' : 'text-red-500 hover:text-red-700 hover:bg-red-50/50'}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="sr-only">Remove link {index + 1}</span>
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <Label htmlFor={`link-label-${index}`} className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Label</Label>
+                          <Input
+                            id={`link-label-${index}`}
+                            placeholder="e.g., YouTube Channel, Portfolio, Behance"
+                            value={link.label}
+                            onChange={(e) => updateCustomLink(index, 'label', e.target.value)}
+                            className={`mt-1 backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`link-url-${index}`} className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>URL</Label>
+                          <Input
+                            id={`link-url-${index}`}
+                            placeholder="https://..."
+                            value={link.url}
+                            onChange={(e) => updateCustomLink(index, 'url', e.target.value)}
+                            className={`mt-1 backdrop-blur-xl shadow-md focus:ring-emerald-400 focus:border-emerald-300 ${isDarkMode ? 'bg-gray-900/50 border-gray-700/80 text-gray-200 placeholder:text-gray-500' : 'bg-white/30 border-white/60'}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className={`flex justify-end gap-4 pt-6 border-t ${isDarkMode ? 'border-gray-700/50' : 'border-white/40'}`}>
+                <Link to={createPageUrl("Dashboard")}>
+                  <Button type="button" variant="outline" className={`backdrop-blur-2xl shadow-lg ${isDarkMode ? 'bg-gray-800/60 border-gray-700/60 hover:bg-gray-700/60 text-gray-300' : 'border-white/50 bg-white/10 hover:bg-white/20'}`}>
+                    Cancel
+                  </Button>
+                </Link>
+                <Button type="submit" disabled={isSubmitting} className={`bg-gradient-to-r backdrop-blur-2xl shadow-lg ${isDarkMode ? 'from-emerald-600/70 to-emerald-700/70 hover:from-emerald-600/90 hover:to-emerald-700/90 border-emerald-500/70' : 'from-emerald-600/60 to-emerald-700/60 hover:from-emerald-700/80 hover:to-emerald-800/80 border-emerald-500/60'}`}>
+                  {isSubmitting ? "Saving..." : profileId ? "Update Profile" : "Create Profile"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

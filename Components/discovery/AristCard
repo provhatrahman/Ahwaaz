@@ -1,0 +1,322 @@
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { MapPin, ExternalLink, X, Instagram, Globe, Star, Mail, Phone, Flag, MoreVertical, CheckCircle, Heart } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { User } from "@/entities/User";
+import ReportArtistModal from "../reports/ReportArtistModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useTheme } from "../theme/ThemeProvider";
+
+const practiceColors = {
+  "Visual Arts": "bg-red-200/70 text-red-900",
+  "Music": "bg-blue-200/70 text-blue-900",
+  "Dance": "bg-purple-200/70 text-purple-900",
+  "Theater": "bg-green-200/70 text-green-900",
+  "Literature": "bg-yellow-200/70 text-yellow-900",
+  "Film": "bg-indigo-200/70 text-indigo-900",
+  "Photography": "bg-pink-200/70 text-pink-900",
+  "Digital Art": "bg-orange-200/70 text-orange-900",
+  "Fashion": "bg-violet-200/70 text-violet-900",
+  "Architecture": "bg-teal-200/70 text-teal-900",
+  "Other": "bg-gray-200/70 text-gray-900"
+};
+
+const darkPracticeColors = {
+  "Visual Arts": "bg-red-900/80 text-red-100",
+  "Music": "bg-blue-900/80 text-blue-100",
+  "Dance": "bg-purple-900/80 text-purple-100",
+  "Theater": "bg-green-900/80 text-green-100",
+  "Literature": "bg-yellow-900/80 text-yellow-100",
+  "Film": "bg-indigo-900/80 text-indigo-100",
+  "Photography": "bg-pink-900/80 text-pink-100",
+  "Digital Art": "bg-orange-900/80 text-orange-100",
+  "Fashion": "bg-violet-900/80 text-violet-100",
+  "Architecture": "bg-teal-900/80 text-teal-100",
+  "Other": "bg-gray-800/80 text-gray-100"
+};
+
+const getContactInfo = (artist) => {
+  switch (artist.contact_method) {
+    case "Email":
+      return {
+        Icon: Mail,
+        text: "Email",
+        href: `mailto:${artist.email}`,
+      };
+    case "Phone":
+      return {
+        Icon: Phone,
+        text: "Call",
+        href: `tel:${artist.phone}`,
+      };
+    case "Instagram":
+       return {
+        Icon: Instagram,
+        text: "Message on Instagram",
+        href: `https://instagram.com/${artist.portfolio_links?.instagram?.replace('@', '')}`,
+      };
+    case "Website":
+       return {
+        Icon: Globe,
+        text: "Contact via Website",
+        href: artist.portfolio_links?.website,
+      };
+    default:
+      return null;
+  }
+}
+
+export default function ArtistCard({ artist, onClose, isModal = false, currentUser, onUserUpdate }) {
+  const { isDarkMode } = useTheme();
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showReportSuccess, setShowReportSuccess] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const contactInfo = getContactInfo(artist);
+
+  useEffect(() => {
+    if (currentUser && currentUser.liked_artists) {
+      setIsLiked(currentUser.liked_artists.includes(artist.id));
+    }
+  }, [currentUser, artist.id]);
+
+  const handleLikeToggle = async (e) => {
+    e.stopPropagation(); // Prevent modal from closing if card is clicked
+    if (!currentUser) return; // Or prompt to login
+
+    const currentLiked = currentUser.liked_artists || [];
+    const newLiked = isLiked
+      ? currentLiked.filter(id => id !== artist.id)
+      : [...currentLiked, artist.id];
+    
+    try {
+      await User.updateMyUserData({ liked_artists: newLiked });
+      setIsLiked(!isLiked);
+      
+      // Call the callback to update the parent component's currentUser state
+      if (onUserUpdate) {
+        onUserUpdate({
+          ...currentUser,
+          liked_artists: newLiked
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update liked artists:", error);
+    }
+  };
+
+  const handleReportSuccess = () => {
+    setShowReportModal(false);
+    setShowReportSuccess(true);
+    setTimeout(() => {
+      setShowReportSuccess(false);
+    }, 4000); // Hide after 4 seconds
+  };
+  
+  const cardContent = (
+    <Card className={`w-full overflow-hidden relative border-0 ${isModal ? (isDarkMode ? 'bg-gray-800/80 backdrop-blur-2xl shadow-2xl shadow-black/80' : 'bg-neutral-50/85 backdrop-blur-2xl shadow-2xl') : (isDarkMode ? 'hover:shadow-2xl hover:shadow-black/80 transition-all duration-300 bg-gray-800/70 backdrop-blur-2xl shadow-lg shadow-black/80' : 'hover:shadow-2xl transition-all duration-300 bg-white/15 backdrop-blur-2xl shadow-lg')}`}>
+      <AnimatePresence>
+        {showReportSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-0 left-0 right-0 p-4 z-20"
+          >
+            <Alert className="bg-emerald-50/80 backdrop-blur-xl border-emerald-200/60 shadow-md">
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                <AlertTitle className="text-emerald-800 font-semibold">Report Submitted</AlertTitle>
+                <AlertDescription className="text-emerald-700">
+                  Thank you for your feedback. Our team will review it shortly.
+                </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <CardHeader className="p-0">
+        <div className="relative">
+          <div className="w-full h-48 bg-gradient-to-br from-emerald-200/50 via-yellow-100/50 to-pink-200/50 flex items-center justify-center">
+            {artist.profile_image_url ? (
+              <div
+                className="w-full h-full bg-cover"
+                style={{
+                  backgroundImage: `url(${artist.profile_image_url})`,
+                  backgroundPosition: artist.profile_image_object_position || 'center',
+                  backgroundSize: `${artist.profile_image_scale || 100}%`
+                }}
+              />
+            ) : (
+              <div className="w-20 h-20 bg-emerald-200/80 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/30 shadow-lg">
+                <span className="text-2xl font-bold text-emerald-700">
+                  {artist.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {isModal && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className={`absolute top-2 right-2 backdrop-blur-xl border shadow-md z-10 ${isDarkMode ? 'bg-gray-900/60 hover:bg-gray-800/80 border-gray-700/50' : 'bg-white/40 hover:bg-white/60 border-white/50'}`}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <div className="flex justify-between items-start gap-2">
+            <div className="flex-1">
+              <h3 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{artist.name}</h3>
+              <div className={`flex items-center gap-2 mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                <MapPin className="w-4 h-4" />
+                <span>{artist.location_city}, {artist.location_country === 'Israel' ? 'Palestine' : artist.location_country}</span>
+              </div>
+            </div>
+            <div className="flex items-center">
+              {currentUser && currentUser.id !== artist.user_id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleLikeToggle}
+                    className={`flex-shrink-0 backdrop-blur-xl ${isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-800 hover:bg-white/30'}`}
+                  >
+                    <Heart className={`w-5 h-5 transition-all ${isLiked ? 'text-red-500 fill-current' : ''}`} />
+                  </Button>
+              )}
+              {currentUser && currentUser.id !== artist.user_id && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`flex-shrink-0 backdrop-blur-xl ${isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50' : 'text-gray-500 hover:text-gray-800 hover:bg-white/30'}`}
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className={`backdrop-blur-xl border shadow-lg ${isDarkMode ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/90 border-white/50'}`}>
+                    <DropdownMenuItem onClick={() => setShowReportModal(true)}>
+                      <Flag className="w-4 h-4 mr-2 text-red-500" />
+                      Report Profile
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge className={`${isDarkMode ? darkPracticeColors[artist.primary_practice] || darkPracticeColors.Other : practiceColors[artist.primary_practice] || practiceColors.Other} font-bold backdrop-blur-xl border-white/20 shadow-sm`}>
+              {artist.primary_practice}
+            </Badge>
+            {artist.secondary_practices?.slice(0, 2).map((practice) => (
+              <Badge key={practice} variant="outline" className={`text-xs backdrop-blur-xl ${isDarkMode ? 'bg-gray-700/40 border-gray-600/40 text-gray-300' : 'bg-white/20 border-white/40 text-gray-600'}`}>
+                {practice}
+              </Badge>
+            ))}
+          </div>
+
+          {artist.style_genre && (
+            <div className="flex items-center gap-2 text-sm">
+              <Star className={`w-4 h-4 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
+              <span className={`font-medium ${isDarkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>{artist.style_genre}</span>
+            </div>
+          )}
+
+          {artist.ethnic_background && (
+            <div className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+              <span className="font-medium">Cultural Background:</span> {artist.ethnic_background}
+            </div>
+          )}
+
+          <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            {artist.bio}
+          </p>
+
+          <div className={`border-t pt-4 space-y-3 ${isDarkMode ? 'border-gray-700/40' : 'border-white/40'}`}>
+            {contactInfo && contactInfo.href && (
+                <Button
+                  onClick={() => window.open(contactInfo.href, '_blank')}
+                  className={`w-full backdrop-blur-xl shadow-md ${isDarkMode ? 'bg-emerald-600/70 hover:bg-emerald-600/90 border border-emerald-500/70' : 'bg-emerald-600/70 hover:bg-emerald-600/90 border border-emerald-500/70'}`}
+                >
+                  <contactInfo.Icon className="w-4 h-4 mr-2" />
+                  {contactInfo.text}
+                </Button>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {artist.portfolio_links?.website && artist.contact_method !== 'Website' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(artist.portfolio_links.website, '_blank')}
+                  className={`flex items-center gap-2 flex-1 backdrop-blur-xl shadow-sm ${isDarkMode ? 'bg-gray-700/40 border-gray-600/60 hover:bg-gray-600/50' : 'bg-white/30 border-white/60 hover:bg-white/40'}`}
+                >
+                  <Globe className="w-4 h-4" />
+                  Website
+                </Button>
+              )}
+              {artist.portfolio_links?.instagram && artist.contact_method !== 'Instagram' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`https://instagram.com/${artist.portfolio_links.instagram.replace('@', '')}`, '_blank')}
+                  className={`flex items-center gap-2 flex-1 backdrop-blur-xl shadow-sm ${isDarkMode ? 'bg-gray-700/40 border-gray-600/60 hover:bg-gray-600/50' : 'bg-white/30 border-white/60 hover:bg-white/40'}`}
+                >
+                  <Instagram className="w-4 h-4" />
+                  Instagram
+                </Button>
+              )}
+              {artist.custom_links?.map((link, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(link.url, '_blank')}
+                  className={`flex items-center gap-2 flex-1 backdrop-blur-xl shadow-sm ${isDarkMode ? 'bg-gray-700/40 border-gray-600/60 hover:bg-gray-600/50' : 'bg-white/30 border-white/60 hover:bg-white/40'}`}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {link.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {showReportModal && (
+          <ReportArtistModal
+            artist={artist}
+            onClose={() => setShowReportModal(false)}
+            onSuccess={handleReportSuccess}
+          />
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+
+  return isModal ? (
+    <motion.div
+      initial={{ scale: 0.95, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.95, opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      {cardContent}
+    </motion.div>
+  ) : cardContent;
+}
