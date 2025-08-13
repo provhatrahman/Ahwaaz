@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Menu, MapIcon, LayoutGrid, Users, LayoutDashboard, Plus, Eye, EyeOff, Edit, Trash2 } from 'lucide-react';
+import { Menu, MapIcon, LayoutGrid, Users, LayoutDashboard, Plus, Eye, EyeOff, Edit, Trash2, Filter, Search, LocateFixed, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -15,6 +15,8 @@ import ArtistCard from '../components/discovery/AristCard.jsx';
 import CityView from '../components/discovery/CityView';
 import Sidebar from '../components/layout/Sidebar';
 import OnboardingTour from '../components/discovery/OnboardingTour';
+import FilterSidebar from '../components/discovery/FilterSidebar';
+import { Input } from '@/components/ui/input';
 import { useTheme } from '../components/theme/ThemeProvider';
 import { createPageUrl } from '@/utils';
 
@@ -38,6 +40,18 @@ export default function MapPage() {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [leafletMap, setLeafletMap] = useState(null);
+  const [filters, setFilters] = useState({
+    practices: [],
+    countries: [],
+    cities: [],
+    genres: [],
+    ethnicities: [],
+    showLikes: false
+  });
 
   useEffect(() => {
     initializeApp();
@@ -130,11 +144,53 @@ export default function MapPage() {
     }
   };
 
-  // Group artists by selected criteria
-  const groupedArtists = React.useMemo(() => {
+  // Apply filters to artists for map/grid views
+  const filteredArtists = useMemo(() => {
+    let filtered = artists;
+    if (filters.showLikes && currentUser) {
+      const likedIds = currentUser.liked_artists || [];
+      filtered = filtered.filter(a => likedIds.includes(a.id));
+    }
+    if (filters.practices.length > 0) {
+      filtered = filtered.filter(a =>
+        filters.practices.includes(a.primary_practice) ||
+        a.secondary_practices?.some(p => filters.practices.includes(p))
+      );
+    }
+    if (filters.countries.length > 0) {
+      filtered = filtered.filter(a => {
+        const displayCountry = a.location_country === 'Israel' ? 'Palestine' : a.location_country;
+        return filters.countries.includes(displayCountry);
+      });
+    }
+    if (filters.cities.length > 0) {
+      filtered = filtered.filter(a => filters.cities.includes(a.location_city));
+    }
+    if (filters.genres.length > 0) {
+      filtered = filtered.filter(a => filters.genres.includes(a.style_genre));
+    }
+    if (filters.ethnicities.length > 0) {
+      filtered = filtered.filter(a => filters.ethnicities.includes(a.ethnic_background));
+    }
+    if (searchTerm.trim()) {
+      const t = searchTerm.toLowerCase();
+      filtered = filtered.filter(a => (
+        a.name?.toLowerCase().includes(t) ||
+        a.primary_practice?.toLowerCase().includes(t) ||
+        a.secondary_practices?.some(p => p.toLowerCase().includes(t)) ||
+        a.ethnic_background?.toLowerCase().includes(t) ||
+        a.location_city?.toLowerCase().includes(t) ||
+        (a.location_country === 'Israel' ? 'palestine' : a.location_country?.toLowerCase()).includes(t) ||
+        a.style_genre?.toLowerCase().includes(t)
+      ));
+    }
+    return filtered;
+  }, [artists, filters, searchTerm, currentUser]);
+
+  // Group artists by selected criteria (for grid and city view)
+  const groupedArtists = useMemo(() => {
     const groups = {};
-    
-    artists.forEach(artist => {
+    filteredArtists.forEach(artist => {
       let key;
       switch (groupBy) {
         case 'country':
@@ -146,15 +202,55 @@ export default function MapPage() {
         default: // city
           key = artist.location_city;
       }
-      
       if (!groups[key]) {
         groups[key] = [];
       }
       groups[key].push(artist);
     });
-    
     return groups;
-  }, [artists, groupBy]);
+  }, [filteredArtists, groupBy]);
+
+  // City clusters for the map view
+  const cityClusters = useMemo(() => {
+    const clusters = {};
+    filteredArtists.forEach(a => {
+      if (!a.location_city || a.latitude == null || a.longitude == null) return;
+      const key = a.location_city;
+      if (!clusters[key]) {
+        clusters[key] = { city: key, artists: [], latSum: 0, lngSum: 0 };
+      }
+      clusters[key].artists.push(a);
+      clusters[key].latSum += a.latitude;
+      clusters[key].lngSum += a.longitude;
+    });
+    return Object.values(clusters).map(c => ({
+      city: c.city,
+      count: c.artists.length,
+      lat: c.latSum / c.artists.length,
+      lng: c.lngSum / c.artists.length,
+      artists: c.artists
+    }));
+  }, [filteredArtists]);
+
+  const countriesCount = useMemo(() => {
+    const set = new Set();
+    filteredArtists.forEach(a => set.add(a.location_country === 'Israel' ? 'Palestine' : a.location_country));
+    return set.size;
+  }, [filteredArtists]);
+
+  const createClusterIcon = (count) => {
+    const size = count >= 100 ? 44 : count >= 10 ? 40 : 36;
+    const html = `\n      <div style="width:${size}px;height:${size}px;border-radius:9999px;display:flex;align-items:center;justify-content:center;background:#10b981;color:#fff;font-weight:700;border:2px solid rgba(16,185,129,0.8);box-shadow:0 4px 10px rgba(0,0,0,0.15)">${count}</div>\n    `;
+    return L.divIcon({ html, className: '', iconSize: [size, size] });
+  };
+
+  const handleLocate = () => {
+    if (!leafletMap || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const { latitude, longitude } = pos.coords;
+      leafletMap.setView([latitude, longitude], 6);
+    });
+  };
 
   if (isLoading) {
     return (
@@ -189,7 +285,7 @@ export default function MapPage() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
+      {/* App Sidebar */}
       <AnimatePresence>
         {showSidebar && (
           <>
@@ -250,15 +346,63 @@ export default function MapPage() {
           </div>
         )}
 
+        {/* Filter Drawer (Map + Grid) */}
+        <div className="fixed top-0 left-0 bottom-0 z-40">
+          <AnimatePresence>
+            {showFilters && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/10"
+                  onClick={() => setShowFilters(false)}
+                />
+                <motion.div
+                  initial={{ x: -320 }}
+                  animate={{ x: 0 }}
+                  exit={{ x: -320 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  className={`w-80 h-full backdrop-blur-2xl border-r shadow-2xl relative ${isDarkMode ? 'bg-gray-800/90 border-gray-700/50' : 'bg-white/15 border-white/25'}`}
+                >
+                  <FilterSidebar
+                    artists={artists}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onClose={() => setShowFilters(false)}
+                    currentUser={currentUser}
+                  />
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Content Area */}
         <div className="flex-1 min-h-0">
           {view === 'map' && (
             <div className="h-full relative">
+              {/* Top center stats pill */}
+              <div className="absolute top-4 left-0 right-0 z-20 flex justify-center">
+                <div className={`px-4 py-2 rounded-full shadow-md border flex items-center gap-4 ${isDarkMode ? 'bg-gray-900/70 border-gray-700/60 text-gray-200' : 'bg-white/80 border-white/60 text-gray-800'}`}>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-medium">{filteredArtists.length} creatives</span>
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-gray-400" />
+                  <div className="flex items-center gap-2">
+                    <MapIcon className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-medium">{countriesCount} countries</span>
+                  </div>
+                </div>
+              </div>
+
               <MapContainer
                 center={[20, 77]}
                 zoom={3}
                 className="h-full w-full"
                 style={{ background: isDarkMode ? '#1f2937' : '#f0fdf4' }}
+                whenCreated={setLeafletMap}
               >
                 <TileLayer
                   url={isDarkMode 
@@ -267,21 +411,71 @@ export default function MapPage() {
                   }
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
-                {artists.map((artist) => (
+                {cityClusters.map((cluster) => (
                   <Marker
-                    key={artist.id}
-                    position={[artist.latitude, artist.longitude]}
+                    key={cluster.city}
+                    position={[cluster.lat, cluster.lng]}
+                    icon={createClusterIcon(cluster.count)}
+                    eventHandlers={{
+                      click: () => setSelectedCity(cluster.city)
+                    }}
                   >
                     <Popup>
                       <div className="p-2">
-                        <h3 className="font-semibold">{artist.name}</h3>
-                        <p className="text-sm text-gray-600">{artist.primary_practice}</p>
-                        <p className="text-xs text-gray-500">{artist.location_city}, {artist.location_country}</p>
+                        <h3 className="font-semibold">{cluster.city}</h3>
+                        <p className="text-sm text-gray-600">{cluster.count} creative{cluster.count !== 1 ? 's' : ''}</p>
                       </div>
                     </Popup>
                   </Marker>
                 ))}
               </MapContainer>
+
+              {/* Floating right-side buttons */}
+              <div className="absolute right-4 z-20 flex flex-col gap-3" style={{ bottom: 'calc(80px + max(1.5rem, env(safe-area-inset-bottom)))' }}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowFilters(true)}
+                  className={`w-12 h-12 rounded-full backdrop-blur-2xl shadow-lg border ${isDarkMode ? 'bg-gray-800/80 border-gray-600/50 hover:bg-gray-700/80 text-gray-300' : 'bg-white/80 border-white/40 hover:bg-white text-gray-800'}`}
+                >
+                  <Filter className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleLocate}
+                  className={`w-12 h-12 rounded-full backdrop-blur-2xl shadow-lg border ${isDarkMode ? 'bg-gray-800/80 border-gray-600/50 hover:bg-gray-700/80 text-gray-300' : 'bg-white/80 border-white/40 hover:bg-white text-gray-800'}`}
+                >
+                  <LocateFixed className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {/* Search overlay */}
+              <AnimatePresence>
+                {showSearch && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 50 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-6 left-6 right-6 z-30"
+                  >
+                    <div className={`flex items-center gap-2 px-4 py-3 rounded-lg backdrop-blur-2xl shadow-lg border ${isDarkMode ? 'bg-gray-800/90 border-gray-600/50' : 'bg-white/90 border-white/40'}`}>
+                      <Search className={`h-5 w-5 flex-shrink-0 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`} />
+                      <Input 
+                        placeholder="Search artists..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="flex-1 !border-none !ring-0 !shadow-none !px-0 !bg-transparent focus-visible:!ring-offset-0"
+                        autoFocus
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => { setShowSearch(false); setSearchTerm(''); }}>
+                        <X className={`w-5 h-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`} />
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -465,7 +659,7 @@ export default function MapPage() {
         </div>
 
         {/* Bottom Navigation Dock */}
-        <div className={`backdrop-blur-3xl border-t flex-shrink-0 shadow-lg ${isDarkMode ? 'bg-gray-900/60 border-gray-700/40' : 'bg-white/20 border-white/30'}`}>
+        <div className={`backdrop-blur-3xl border-t flex-shrink-0 shadow-lg z-50 ${isDarkMode ? 'bg-gray-900/60 border-gray-700/40' : 'bg-white/20 border-white/30'}`}>
           <div className="px-4 pt-3 pb-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
             <div className="flex items-center justify-between max-w-md mx-auto">
               {/* Menu Button */}
@@ -505,6 +699,18 @@ export default function MapPage() {
                   <LayoutGrid style={{ width: '20px', height: '20px' }} />
                 </Button>
               </div>
+
+              {/* Search button */}
+              <Button
+                variant="ghost"
+                onClick={() => setShowSearch(true)}
+                className="w-16 h-12 p-0 bg-transparent hover:bg-transparent transition-all flex items-center justify-center"
+              >
+                <Search 
+                  style={{ width: '22px', height: '22px' }}
+                  className={`transition-colors ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'}`} 
+                />
+              </Button>
 
               {/* Dashboard Button */}
               <Button
