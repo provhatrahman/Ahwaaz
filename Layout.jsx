@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ThemeProvider } from './components/theme/ThemeProvider';
+import { ThemeProvider } from './Components/theme/ThemeProvider.jsx';
 
 export default function Layout({ children, currentPageName }) {
   useEffect(() => {

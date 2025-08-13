@@ -12,9 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/entities/User";
-import ReportArtistModal from "../reports/ReportArtistModal";
+import ReportArtistModal from "../reports/ReportArtistModel.jsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useTheme } from "../theme/ThemeProvider";
+import { useTheme } from "../theme/ThemeProvider.jsx";
 
 const practiceColors = {
   "Visual Arts": "bg-red-200/70 text-red-900",

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, ArrowLeft, Menu, MapIcon, Grid3x3, Search, Filter, Shuffle, LayoutDashboard, Heart, Flag, Users, MoreVertical } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Menu, MapIcon, LayoutGrid, Search, Filter, Shuffle, LayoutDashboard, Heart, Flag, Users, MoreVertical } from 'lucide-react';
 import { useTheme } from '../theme/ThemeProvider';
 
 const TourComponentWrapper = ({ children, className = "" }) => {
@@ -52,19 +52,19 @@ const tourSteps = [
     description: 'Use the dock at the bottom to switch between the interactive map view and grid view to explore artists.',
     renderComponent: () => (
       <TourComponentWrapper>
-        <div className="flex items-center justify-center gap-6 bg-white/20 border border-white/30 rounded-lg p-4 backdrop-blur-xl">
+            <div className="flex items-center justify-center gap-6 bg-white/20 border border-white/30 rounded-lg p-4 backdrop-blur-xl">
           <div className="flex flex-col items-center gap-2">
             <div className="w-16 h-12 flex items-center justify-center">
               <MapIcon className="w-6 h-6 text-emerald-600" />
             </div>
             <span className="text-xs text-gray-600 dark:text-gray-400">Map</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-16 h-12 flex items-center justify-center">
-              <Grid3x3 className="w-6 h-6 text-gray-600" />
-            </div>
-            <span className="text-xs text-gray-600 dark:text-gray-400">Grid</span>
-          </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-12 flex items-center justify-center">
+                  <LayoutGrid className="w-6 h-6 text-gray-600" />
+                </div>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Grid</span>
+              </div>
         </div>
       </TourComponentWrapper>
     )

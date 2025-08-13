@@ -18,7 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { createPageUrl } from "@/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { countries } from "@/components/data/countries";
+import { countries } from "@/components/data/countries.jsx";
 import { InvokeLLM } from "@/integrations/Core";
 import ImageUploadPreview from "../components/profile/ImageUploadPreview";
 import { useTheme } from "../components/theme/ThemeProvider";

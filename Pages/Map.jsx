@@ -4,14 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Menu, MapIcon, Grid3x3, Users, LayoutDashboard, Plus, Eye, EyeOff, Edit, Trash2 } from 'lucide-react';
+import { Menu, MapIcon, LayoutGrid, Users, LayoutDashboard, Plus, Eye, EyeOff, Edit, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 import { Artist } from '@/entities/Artist';
 import { User } from '@/entities/User';
-import ArtistCard from '../components/discovery/AristCard';
+import ArtistCard from '../components/discovery/AristCard.jsx';
 import CityView from '../components/discovery/CityView';
 import Sidebar from '../components/layout/Sidebar';
 import OnboardingTour from '../components/discovery/OnboardingTour';
@@ -502,7 +502,7 @@ export default function MapPage() {
                       : (isDarkMode ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50' : 'text-gray-600 hover:text-gray-800 hover:bg-white/30')
                   }`}
                 >
-                  <Grid3x3 style={{ width: '20px', height: '20px' }} />
+                  <LayoutGrid style={{ width: '20px', height: '20px' }} />
                 </Button>
               </div>
 

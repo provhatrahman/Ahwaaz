@@ -1,4 +1,4 @@
-import { supabase } from '../integrations/Core.js';
+import { supabase } from '../integrations/Core.jsx';
 
 export class Report {
   static async create(reportData) {

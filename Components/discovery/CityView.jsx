@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, MapPin, Users, Filter, Shuffle, Search, X } from "lucide-react";
-import ArtistCard from "./ArtistCard";
+import ArtistCard from "./AristCard.jsx";
 import FilterSidebar from "./FilterSidebar";
 import { useTheme } from "../theme/ThemeProvider";
 

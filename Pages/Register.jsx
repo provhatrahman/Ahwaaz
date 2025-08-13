@@ -14,7 +14,7 @@ import { motion } from "framer-motion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { countries } from "@/components/data/countries";
+import { countries } from "@/components/data/countries.jsx";
 
 
 const creativePractices = [

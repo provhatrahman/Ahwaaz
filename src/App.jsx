@@ -1,15 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from '../Layout.js';
+import Layout from '../Layout.jsx';
 
 // Import all pages
-import MapPage from '../Pages/Map.js';
-import ProfilePage from '../Pages/Profile.js';
-import DashboardPage from '../Pages/Dashboard.js';
-import AboutPage from '../Pages/About.js';
-import FeedbackPage from '../Pages/Feedback.js';
-import InstallPage from '../Pages/Install.js';
-import AdminPortalPage from '../Pages/AdminPortal.js';
+import MapPage from '../Pages/Map.jsx';
+import ProfilePage from '../Pages/Profile';
+import DashboardPage from '../Pages/Dashboard';
+import AboutPage from '../Pages/About';
+import FeedbackPage from '../Pages/Feedback';
+import InstallPage from '../Pages/Install';
+import AdminPortalPage from '../Pages/AdminPortal';
 
 function App() {
   return (
